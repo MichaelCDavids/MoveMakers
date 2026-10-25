@@ -8,9 +8,14 @@
                 <span id="challenge-badge" class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-50 font-monospace">
                     CHALLENGE <span id="challenge-num">1</span> OF 4
                 </span>
-                <span id="audio-status-btn" class="badge bg-secondary bg-opacity-25 text-light border border-secondary cursor-pointer" role="button">
-                    🔊 Sound ON
-                </span>
+                <div class="d-flex gap-2">
+                    <span id="person-indicator" class="badge bg-secondary font-monospace">
+                        👤 Person: Off
+                    </span>
+                    <span id="audio-status-btn" class="badge bg-secondary bg-opacity-25 text-light border border-secondary cursor-pointer" role="button">
+                        🔊 Sound ON
+                    </span>
+                </div>
             </div>
 
             <!-- Main Question Display -->
@@ -25,16 +30,27 @@
             <div class="progress bg-dark border border-secondary border-opacity-50" style="height: 6px;">
                 <div id="challenge-progress" class="progress-bar bg-info progress-bar-striped progress-bar-animated" role="progressbar" style="width: 25%;"></div>
             </div>
+
+            <!-- Pose Hold Confirmation Bar -->
+            <div id="hold-progress-container" class="mt-2" style="display: none;">
+                <div class="d-flex justify-content-between small font-monospace text-success mb-1">
+                    <span id="hold-status-text">Holding Hungry pose...</span>
+                    <span id="hold-pct">0%</span>
+                </div>
+                <div class="progress bg-dark border border-success border-opacity-50" style="height: 8px;">
+                    <div id="hold-bar" class="progress-bar bg-success progress-bar-striped progress-bar-animated" style="width: 0%;"></div>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Center Camera HUD Viewfinder -->
     <div class="text-center position-relative my-2">
         <div id="position-yourself" class="small text-info text-opacity-75 mb-2 font-monospace">
-            1. Align yourself with device camera and click Start
+            1. Stand or sit so your upper body (shoulders & arms) are visible in the frame
         </div>
 
-        <div class="hud-viewfinder mx-auto position-relative" style="width: 360px; height: 360px; max-width: 90vw;">
+        <div class="hud-viewfinder mx-auto position-relative" style="width: 380px; height: 380px; max-width: 92vw;">
             <!-- Viewfinder HUD Overlays -->
             <div class="hud-corner hud-corner-tl"></div>
             <div class="hud-corner hud-corner-tr"></div>
@@ -49,35 +65,53 @@
                 <span id="hud-status-text">CAMERA STANDBY</span>
             </div>
 
-            <!-- Top Right Mirror Toggle -->
-            <button id="mirror-btn" type="button" class="btn btn-sm btn-dark position-absolute top-0 end-0 m-2 border border-secondary border-opacity-50 text-white-50" style="z-index: 8;" title="Flip Camera Orientation">
-                ⇄ Flip
-            </button>
+            <!-- Top Right Camera Controls -->
+            <div class="position-absolute top-0 end-0 m-2 d-flex gap-1" style="z-index: 8;">
+                <button id="mirror-btn" type="button" class="btn btn-sm btn-dark border border-secondary border-opacity-50 text-white-50" title="Flip Camera Orientation">
+                    ⇄ Flip
+                </button>
+            </div>
 
-            <!-- Canvas Element -->
-            <canvas id="canvas" width="360" height="360" class="w-100 h-100" style="display: none; object-fit: cover;">
+            <!-- Hidden native HTML5 video stream element -->
+            <video id="webcam-video" playsinline muted autoplay class="d-none"></video>
+
+            <!-- Primary Drawing Canvas Element -->
+            <canvas id="canvas" width="380" height="380" class="w-100 h-100" style="display: none; object-fit: cover;">
                 <div id="webcam-container"></div>
             </canvas>
 
             <!-- Idle / Standby Screen -->
             <div id="camera-idle-screen" class="d-flex flex-column align-items-center justify-content-center w-100 h-100 p-4">
-                <div class="mb-3 text-info text-opacity-50" style="font-size: 48px;">📷</div>
+                <div class="mb-3 text-info text-opacity-50" style="font-size: 52px;">📷</div>
                 <h5 class="text-white mb-1">Ready for Action</h5>
-                <p class="small text-white-50 mb-0">Click the green <strong>Start</strong> button below to launch webcam tracking.</p>
+                <p class="small text-white-50 mb-3">Click the green <strong>Start Camera</strong> button below to enable real-time pose tracking.</p>
+                <div class="small text-info text-opacity-75 font-monospace">
+                    Tip: Ensure good lighting so your shoulders & arms are clear
+                </div>
+            </div>
+
+            <!-- Bottom Tracking HUD Bar -->
+            <div id="camera-hud-bottom" class="position-absolute bottom-0 start-0 end-0 px-3 py-1.5 bg-dark bg-opacity-75 border-top border-secondary border-opacity-25 d-flex justify-content-between align-items-center small font-monospace" style="z-index: 7; display: none !important;">
+                <span id="body-tracking-label" class="text-white-50">
+                    Keypoints: <strong class="text-info">0/17</strong>
+                </span>
+                <span id="body-confidence-label" class="text-success">
+                    Confidence: <strong class="text-white">0%</strong>
+                </span>
             </div>
 
             <!-- Success Feedback Overlay -->
             <div id="correct-toggle" class="hud-feedback-overlay card bg-success text-white shadow-lg p-3 text-center border-0" style="display: none;">
                 <div style="font-size: 36px;">✨</div>
                 <h3 id="correct-toggle-header" class="fw-bold mb-1">Correct!</h3>
-                <p class="small text-white-50 mb-0">Gesture recognized with high confidence</p>
+                <p class="small text-white-50 mb-0">Gesture recognized & confirmed!</p>
             </div>
 
             <!-- Incorrect Feedback Overlay -->
             <div id="incorrect-toggle" class="hud-feedback-overlay card bg-danger text-white shadow-lg p-3 text-center border-0" style="display: none;">
                 <div style="font-size: 36px;">⚠️</div>
                 <h4 id="incorrect-toggle-header" class="fw-bold mb-1">Try Again</h4>
-                <p class="small text-white-50 mb-0">Hold pose steady in front of camera</p>
+                <p class="small text-white-50 mb-0">Step back and hold pose steady</p>
             </div>
         </div>
     </div>
@@ -148,7 +182,7 @@
     <!-- Interactive Simulation Test Panel -->
     <div class="card bg-dark border-secondary border-opacity-25 mx-auto mt-4 p-3" style="max-width: 680px;">
         <div class="small text-white-50 mb-2 text-center">
-            <strong>Interactive Gesture Test Controls</strong> (Click button to trigger gesture for testing):
+            <strong>Interactive Gesture Test Controls</strong> (Click button to simulate gesture test):
         </div>
         <div class="d-flex flex-wrap justify-content-center gap-2">
             <button type="button" class="btn btn-sm btn-outline-info sim-btn" data-gesture="Hungry">🍽️ Hungry</button>

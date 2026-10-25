@@ -1,4 +1,4 @@
-// MoveMakers - Teachable Machine Pose Model & HUD Controller
+// MoveMakers - Robust Camera & PoseNet Gesture Detection Engine
 // ProjectCodeX December Hackathon
 
 window.addEventListener("DOMContentLoaded", function () {
@@ -15,14 +15,21 @@ window.addEventListener("DOMContentLoaded", function () {
     }
 
     const URL = "https://teachablemachine.withgoogle.com/models/C8EwO48qN/";
-    let model, webcam, ctx, maxPredictions;
+    let model, ctx, maxPredictions;
+    let localStream = null;
 
-    // HUD Elements
+    // DOM Elements
+    const videoElem = document.getElementById("webcam-video");
     const canvas = document.getElementById("canvas");
     const idleScreen = document.getElementById("camera-idle-screen");
     const hudScanner = document.getElementById("hud-scanner");
     const hudStatusText = document.getElementById("hud-status-text");
     const hudStatusDot = document.getElementById("hud-status-dot");
+    const personIndicator = document.getElementById("person-indicator");
+    const cameraHudBottom = document.getElementById("camera-hud-bottom");
+    const bodyTrackingLabel = document.getElementById("body-tracking-label");
+    const bodyConfidenceLabel = document.getElementById("body-confidence-label");
+
     const mirrorBtn = document.getElementById("mirror-btn");
     const audioBtn = document.getElementById("audio-status-btn");
 
@@ -40,6 +47,12 @@ window.addEventListener("DOMContentLoaded", function () {
     const challengeNumElem = document.getElementById("challenge-num");
     const challengeProgressBar = document.getElementById("challenge-progress");
 
+    // Hold Confirmation Elements
+    const holdContainer = document.getElementById("hold-progress-container");
+    const holdBar = document.getElementById("hold-bar");
+    const holdStatusText = document.getElementById("hold-status-text");
+    const holdPct = document.getElementById("hold-pct");
+
     const showMeList = ["Hungry", "I See You", "Quiet Down", "Get Busy"];
     const gestureHints = [
         "Hint: Bring your hand up towards your mouth as if eating.",
@@ -53,7 +66,12 @@ window.addEventListener("DOMContentLoaded", function () {
     let isRunning = false;
     let isFlipped = true;
 
-    // Toggle Audio
+    // Gesture hold-to-confirm counter
+    let holdCount = 0;
+    const REQUIRED_HOLD_FRAMES = 12; // ~0.4-0.5s of holding pose for certainty
+    let isAdvancing = false;
+
+    // Audio Toggle
     if (audioBtn) {
         audioBtn.addEventListener("click", function () {
             soundMuted = !soundMuted;
@@ -63,21 +81,18 @@ window.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Toggle Camera Flip
+    // Mirror Flip Toggle
     if (mirrorBtn) {
         mirrorBtn.addEventListener("click", function () {
             isFlipped = !isFlipped;
-            if (canvas) {
-                canvas.style.transform = isFlipped ? "scaleX(1)" : "scaleX(-1)";
-            }
         });
     }
 
-    // Interactive Test Buttons
+    // Test Simulation Buttons
     document.querySelectorAll(".sim-btn").forEach(btn => {
         btn.addEventListener("click", function () {
             const g = this.getAttribute("data-gesture");
-            checkForGesture(g);
+            handleGestureConfirmed(g);
         });
     });
 
@@ -99,6 +114,11 @@ window.addEventListener("DOMContentLoaded", function () {
                 challengeProgressBar.style.width = `${pct}%`;
             }
 
+            // Reset hold progress
+            holdCount = 0;
+            if (holdContainer) holdContainer.style.display = "none";
+            if (holdBar) holdBar.style.width = "0%";
+
             // Highlight target card
             for (let i = 0; i < 4; i++) {
                 const card = document.getElementById(`pred-card-${i}`);
@@ -117,18 +137,30 @@ window.addEventListener("DOMContentLoaded", function () {
             if (hudStatusText) hudStatusText.textContent = "INITIALIZING MODEL...";
             if (hudStatusDot) hudStatusDot.style.backgroundColor = "#f59e0b";
 
+            // Load Teachable Machine Pose model
             if (!model) {
                 model = await tmPose.load(modelURL, metadataURL);
                 maxPredictions = model.getTotalClasses();
             }
 
-            const size = 360;
-            webcam = new tmPose.Webcam(size, size, isFlipped);
+            // Launch Camera using standard getUserMedia
+            if (hudStatusText) hudStatusText.textContent = "ACCESSING WEBCAM...";
 
             try {
-                if (hudStatusText) hudStatusText.textContent = "REQUESTING CAMERA...";
-                await webcam.setup();
-                await webcam.play();
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                    },
+                    audio: false
+                });
+
+                if (videoElem) {
+                    videoElem.srcObject = localStream;
+                    await videoElem.play();
+                }
+
                 isRunning = true;
 
                 if (hudStatusText) hudStatusText.textContent = "LIVE • POSE TRACKING";
@@ -136,20 +168,33 @@ window.addEventListener("DOMContentLoaded", function () {
                 if (hudScanner) hudScanner.style.display = "block";
                 if (idleScreen) idleScreen.style.display = "none";
                 if (canvas) canvas.style.display = "block";
+                if (cameraHudBottom) cameraHudBottom.style.setProperty("display", "flex", "important");
 
-                window.requestAnimationFrame(loop);
-            } catch (cameraErr) {
-                console.warn("Camera setup failed or denied:", cameraErr);
-                if (hudStatusText) hudStatusText.textContent = "SIMULATION READY";
-                if (hudStatusDot) hudStatusDot.style.backgroundColor = "#38bdf8";
-                if (alignTextElem) {
-                    alignTextElem.innerHTML = '<span class="text-warning">Camera unavailable. You can use the gesture test buttons below to play!</span>';
+                window.requestAnimationFrame(renderLoop);
+            } catch (camErr) {
+                console.warn("Direct webcam failed, trying fallback:", camErr);
+                try {
+                    // Fallback to basic video constraint
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    if (videoElem) {
+                        videoElem.srcObject = localStream;
+                        await videoElem.play();
+                    }
+                    isRunning = true;
+                    if (canvas) canvas.style.display = "block";
+                    if (idleScreen) idleScreen.style.display = "none";
+                    window.requestAnimationFrame(renderLoop);
+                } catch (fallbackErr) {
+                    console.error("Camera access blocked or denied:", fallbackErr);
+                    if (hudStatusText) hudStatusText.textContent = "SIMULATION MODE";
+                    if (hudStatusDot) hudStatusDot.style.backgroundColor = "#38bdf8";
+                    if (alignTextElem) {
+                        alignTextElem.innerHTML = '<span class="text-warning">Camera access blocked. Click the gesture buttons below to test!</span>';
+                    }
                 }
             }
 
             if (canvas) {
-                canvas.width = size;
-                canvas.height = size;
                 ctx = canvas.getContext("2d");
             }
 
@@ -159,79 +204,268 @@ window.addEventListener("DOMContentLoaded", function () {
 
             updateChallengeUI();
         } catch (err) {
-            console.error("Init failed:", err);
+            console.error("Initialization error:", err);
             if (hudStatusText) hudStatusText.textContent = "MODEL ERROR";
             if (hudStatusDot) hudStatusDot.style.backgroundColor = "#ef4444";
         }
     }
 
-    async function loop() {
+    async function renderLoop() {
         if (!isRunning) return;
-        if (webcam && webcam.canvas) {
-            webcam.update();
-            await predict();
+
+        if (videoElem && videoElem.readyState >= 2 && canvas && ctx) {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Draw video frame to canvas
+            ctx.save();
+            if (isFlipped) {
+                ctx.translate(w, 0);
+                ctx.scale(-1, 1);
+            }
+            ctx.drawImage(videoElem, 0, 0, w, h);
+            ctx.restore();
+
+            // Run PoseNet estimation
+            if (model && !isAdvancing) {
+                try {
+                    const { pose, posenetOutput } = await model.estimatePose(canvas);
+                    const prediction = await model.predict(posenetOutput);
+
+                    // Check keypoints for person detection
+                    if (pose && pose.keypoints) {
+                        const validKeypoints = pose.keypoints.filter(k => k.score > 0.2);
+                        const count = validKeypoints.length;
+
+                        // Draw enhanced skeleton & joints
+                        drawEnhancedPose(pose, ctx, w, h);
+
+                        // Update Person Tracking Indicator
+                        if (personIndicator) {
+                            if (count >= 5) {
+                                personIndicator.className = "badge bg-success font-monospace";
+                                personIndicator.textContent = `👤 Person: Locked (${count}/17)`;
+                            } else {
+                                personIndicator.className = "badge bg-warning text-dark font-monospace";
+                                personIndicator.textContent = `👤 Step back into frame (${count}/17)`;
+                            }
+                        }
+
+                        if (bodyTrackingLabel) {
+                            bodyTrackingLabel.innerHTML = `Keypoints: <strong class="text-info">${count}/17</strong>`;
+                        }
+                        if (bodyConfidenceLabel) {
+                            const avgConf = Math.round((pose.score || 0) * 100);
+                            bodyConfidenceLabel.innerHTML = `Pose Confidence: <strong class="text-white">${avgConf}%</strong>`;
+                        }
+                    } else {
+                        if (personIndicator) {
+                            personIndicator.className = "badge bg-secondary font-monospace";
+                            personIndicator.textContent = "👤 Person: Searching...";
+                        }
+                    }
+
+                    // Process Gesture Predictions
+                    let topClass = "";
+                    let topProb = 0;
+
+                    for (let i = 0; i < maxPredictions; i++) {
+                        const prob = prediction[i].probability;
+                        const pct = Math.round(prob * 100);
+
+                        const bar = document.getElementById(`pred-bar-${i}`);
+                        const text = document.getElementById(`pred-pct-${i}`);
+                        if (bar) bar.style.width = `${pct}%`;
+                        if (text) text.textContent = `${pct}%`;
+
+                        if (prob > topProb) {
+                            topProb = prob;
+                            topClass = prediction[i].className;
+                        }
+                    }
+
+                    // Check against current target challenge
+                    const targetName = showMeList[lookingForIndex];
+                    const normalizedTop = getModelName(topClass);
+
+                    // If the current target is detected with >= 0.50 probability
+                    const targetProb = prediction[lookingForIndex] ? prediction[lookingForIndex].probability : 0;
+                    const isTargetActive = (normalizedTop === targetName && topProb >= 0.50) || (targetProb >= 0.60);
+
+                    if (isTargetActive) {
+                        holdCount++;
+                        if (holdContainer) holdContainer.style.display = "block";
+                        const pct = Math.min(100, Math.round((holdCount / REQUIRED_HOLD_FRAMES) * 100));
+                        if (holdBar) holdBar.style.width = `${pct}%`;
+                        if (holdPct) holdPct.textContent = `${pct}%`;
+                        if (holdStatusText) {
+                            holdStatusText.textContent = `Holding ${targetName} pose... ${pct}%`;
+                        }
+
+                        if (holdCount >= REQUIRED_HOLD_FRAMES) {
+                            handleGestureConfirmed(targetName);
+                        }
+                    } else {
+                        // Slowly decay hold if user drops pose
+                        if (holdCount > 0) {
+                            holdCount = Math.max(0, holdCount - 2);
+                            const pct = Math.round((holdCount / REQUIRED_HOLD_FRAMES) * 100);
+                            if (holdBar) holdBar.style.width = `${pct}%`;
+                            if (holdPct) holdPct.textContent = `${pct}%`;
+                            if (holdCount === 0 && holdContainer) {
+                                holdContainer.style.display = "none";
+                            }
+                        }
+                    }
+
+                } catch (predErr) {
+                    // Frame drop
+                }
+            }
         }
-        window.requestAnimationFrame(loop);
+
+        window.requestAnimationFrame(renderLoop);
     }
 
-    async function predict() {
-        if (!model || !webcam || !webcam.canvas) return;
+    function drawEnhancedPose(pose, ctx, w, h) {
+        if (!pose || !pose.keypoints) return;
 
-        try {
-            const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
-            const prediction = await model.predict(posenetOutput);
+        // Draw connections
+        const minPartConfidence = 0.25;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#00f0ff";
+        ctx.shadowColor = "#00f0ff";
+        ctx.shadowBlur = 8;
+        tmPose.drawSkeleton(pose.keypoints, minPartConfidence, ctx);
+        ctx.shadowBlur = 0;
 
-            let highestProbability = 0;
-            let gestureName = "";
+        // Draw glowing joint points
+        pose.keypoints.forEach((kp, idx) => {
+            if (kp.score >= minPartConfidence) {
+                const { x, y } = kp.position;
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, Math.PI * 2);
 
-            drawPose(pose);
+                // Highlight wrists and hands in pink, face in cyan, shoulders in yellow
+                if (idx === 9 || idx === 10) {
+                    ctx.fillStyle = "#ec4899"; // wrists / hands
+                    ctx.shadowColor = "#ec4899";
+                    ctx.shadowBlur = 10;
+                } else if (idx === 5 || idx === 6) {
+                    ctx.fillStyle = "#eab308"; // shoulders
+                    ctx.shadowColor = "#eab308";
+                    ctx.shadowBlur = 6;
+                } else {
+                    ctx.fillStyle = "#38bdf8"; // joints
+                    ctx.shadowBlur = 4;
+                }
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        });
+    }
 
-            // Update real-time prediction meter cards
-            for (let i = 0; i < maxPredictions; i++) {
-                const prob = prediction[i].probability;
-                const pct = Math.round(prob * 100);
+    function getModelName(gestureName) {
+        switch (gestureName) {
+            case "ISeeYou":
+                return "I See You";
+            case "GetBusy":
+                return "Get Busy";
+            case "QuietDown":
+                return "Quiet Down";
+            default:
+                return gestureName;
+        }
+    }
 
-                const bar = document.getElementById(`pred-bar-${i}`);
-                const text = document.getElementById(`pred-pct-${i}`);
-                if (bar) bar.style.width = `${pct}%`;
-                if (text) text.textContent = `${pct}%`;
+    function handleGestureConfirmed(gestureName) {
+        if (isAdvancing) return;
+        const targetName = showMeList[lookingForIndex];
+        const normalized = getModelName(gestureName);
 
-                if (prob > highestProbability) {
-                    highestProbability = prob;
-                    gestureName = prediction[i].className;
+        if (normalized === targetName) {
+            isAdvancing = true;
+            playSound(bell);
+
+            if (holdContainer) holdContainer.style.display = "none";
+            if (incorrectElement) incorrectElement.style.display = "none";
+            if (correctElement) {
+                correctElement.style.display = "block";
+                if (correctHeaderElement) {
+                    correctHeaderElement.innerHTML = `Great job! You made the <strong>${targetName}</strong> gesture!`;
                 }
             }
 
-            // Real-time confidence threshold
-            if (highestProbability >= 0.85) {
-                checkForGestureThrottled(gestureName);
+            setTimeout(function () {
+                if (correctElement) correctElement.style.display = "none";
+            }, 2000);
+
+            setTimeout(async function () {
+                await advanceQuestion();
+                isAdvancing = false;
+            }, 1800);
+        } else {
+            playSound(error);
+            if (incorrectElement) {
+                incorrectElement.style.display = "block";
+                if (incorrectHeaderElement) {
+                    incorrectHeaderElement.innerHTML = `Pose not recognized for <strong>${targetName}</strong>`;
+                }
+                setTimeout(function () {
+                    if (incorrectElement) incorrectElement.style.display = "none";
+                }, 1800);
             }
-        } catch (e) {
-            // Drop frame gracefully
         }
     }
 
-    function drawPose(pose) {
-        if (webcam && webcam.canvas && ctx) {
-            ctx.drawImage(webcam.canvas, 0, 0, canvas.width, canvas.height);
-            if (pose) {
-                const minPartConfidence = 0.5;
-                tmPose.drawKeypoints(pose.keypoints, minPartConfidence, ctx);
-                tmPose.drawSkeleton(pose.keypoints, minPartConfidence, ctx);
+    async function advanceQuestion() {
+        lookingForIndex++;
+        if (lookingForIndex < showMeList.length) {
+            updateChallengeUI();
+        } else {
+            // All 4 challenges completed!
+            playSound(jinglebells);
+            if (questionElem) {
+                questionElem.innerHTML = "🎉 Congratulations! You Mastered All Gestures! 🎉";
             }
+            if (gestureHintElem) {
+                gestureHintElem.innerHTML = "<span class='text-success fw-bold'>All 4 challenges completed. Check your score on the Leaderboard!</span>";
+            }
+            if (challengeProgressBar) {
+                challengeProgressBar.style.width = "100%";
+                challengeProgressBar.classList.remove("bg-info");
+                challengeProgressBar.classList.add("bg-success");
+            }
+            await stop();
+
+            if (restartBtn) restartBtn.style.display = "inline-block";
+            if (startBtn) startBtn.style.display = "none";
+
+            // Record completed score
+            fetch('/api/score', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ score: 4 })
+            }).catch(e => console.warn(e));
         }
     }
 
     async function stop() {
         isRunning = false;
-        if (webcam) {
-            try { await webcam.stop(); } catch (e) {}
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
         }
         if (hudScanner) hudScanner.style.display = "none";
         if (canvas) canvas.style.display = "none";
         if (idleScreen) idleScreen.style.display = "flex";
+        if (cameraHudBottom) cameraHudBottom.style.setProperty("display", "none", "important");
         if (hudStatusText) hudStatusText.textContent = "CAMERA STANDBY";
         if (hudStatusDot) hudStatusDot.style.backgroundColor = "#64748b";
+        if (personIndicator) {
+            personIndicator.className = "badge bg-secondary font-monospace";
+            personIndicator.textContent = "👤 Person: Off";
+        }
 
         if (startBtn) startBtn.style.display = "inline-block";
         if (stopBtn) stopBtn.style.display = "none";
@@ -262,106 +496,6 @@ window.addEventListener("DOMContentLoaded", function () {
             await init();
         });
     }
-
-    function getModelName(gestureName) {
-        switch (gestureName) {
-            case "ISeeYou":
-                return "I See You";
-            case "GetBusy":
-                return "Get Busy";
-            case "QuietDown":
-                return "Quiet Down";
-            default:
-                return gestureName;
-        }
-    }
-
-    function currentlyLookingFor() {
-        if (lookingForIndex < showMeList.length) {
-            return showMeList[lookingForIndex];
-        }
-        return "";
-    }
-
-    async function checkForGesture(gesture) {
-        if (!gesture || gesture === "Nothing") return;
-
-        const lookingFor = currentlyLookingFor();
-        const formatted = getModelName(gesture);
-
-        if (lookingFor !== "" && formatted === lookingFor) {
-            if (webcam && webcam.pause) {
-                try { await webcam.pause(); } catch (e) {}
-            }
-            playSound(bell);
-
-            if (incorrectElement) incorrectElement.style.display = "none";
-            if (correctElement) {
-                correctElement.style.display = "block";
-                if (correctHeaderElement) {
-                    correctHeaderElement.innerHTML = `Great job! You made the <strong>${lookingFor}</strong> gesture!`;
-                }
-            }
-
-            setTimeout(function () {
-                if (correctElement) correctElement.style.display = "none";
-            }, 2500);
-
-            setTimeout(async function () {
-                await advanceQuestion();
-            }, 2000);
-
-        } else if (lookingFor !== "") {
-            if (incorrectElement) {
-                incorrectElement.style.display = "block";
-                if (incorrectHeaderElement) {
-                    incorrectHeaderElement.innerHTML = `Pose not recognized for <strong>${lookingFor}</strong>`;
-                }
-            }
-            playSound(error);
-
-            setTimeout(function () {
-                if (incorrectElement) incorrectElement.style.display = "none";
-            }, 2000);
-        }
-    }
-
-    async function advanceQuestion() {
-        lookingForIndex++;
-        if (lookingForIndex < showMeList.length) {
-            updateChallengeUI();
-            if (webcam && webcam.play) {
-                try { await webcam.play(); } catch (e) {}
-            }
-        } else {
-            // Victory!
-            playSound(jinglebells);
-            if (questionElem) {
-                questionElem.innerHTML = "🎉 Congratulations! You Mastered All Gestures! 🎉";
-            }
-            if (gestureHintElem) {
-                gestureHintElem.innerHTML = "<span class='text-success fw-bold'>All 4 challenges completed. Check your score on the Leaderboard!</span>";
-            }
-            if (challengeProgressBar) {
-                challengeProgressBar.style.width = "100%";
-                challengeProgressBar.classList.remove("bg-info");
-                challengeProgressBar.classList.add("bg-success");
-            }
-            await stop();
-
-            if (restartBtn) restartBtn.style.display = "inline-block";
-            if (startBtn) startBtn.style.display = "none";
-
-            // Submit completed score to database
-            fetch('/api/score', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ score: 4 })
-            }).catch(e => console.warn(e));
-        }
-    }
-
-    const checkForGestureThrottled = _.throttle(checkForGesture, 2500);
 
     // Initial setup
     updateChallengeUI();
