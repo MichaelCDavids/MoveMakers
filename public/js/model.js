@@ -5,7 +5,7 @@ window.addEventListener("DOMContentLoaded", function () {
     let soundMuted = false;
     const bell = new Audio('/audio/bell.mp3');
     const jinglebells = new Audio('/audio/jinglebells.mp3');
-    const error = new Audio('/audio/error.mp3');
+    const errorSound = new Audio('/audio/error.mp3');
 
     function playSound(audio) {
         if (!soundMuted && audio) {
@@ -62,8 +62,8 @@ window.addEventListener("DOMContentLoaded", function () {
     const showMeList = ["Hungry", "I See You", "Quiet Down", "Get Busy"];
     const gestureHints = [
         "Hint: Bring your hand up towards your mouth as if eating.",
-        "Hint: Point your index & middle fingers towards your eyes (peace style).",
-        "Hint: Hold your index finger upright in front of your lips (shh gesture).",
+        "Hint: Point your index & middle fingers towards your eyes.",
+        "Hint: Hold your index finger upright in front of your lips.",
         "Hint: Raise both hands up and groove to the music!"
     ];
     const gestureEmojis = ["🍽️", "👀", "🤫", "💃"];
@@ -102,10 +102,10 @@ window.addEventListener("DOMContentLoaded", function () {
     // Camera Availability Check & Diagnostic Logger
     async function checkCameraAvailability() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            const error = new Error("navigator.mediaDevices.getUserMedia is not supported in this browser or context.");
-            error.name = "NotSupportedError";
-            console.error("[MediaPipe/Camera Stream Issue] Browser missing mediaDevices or getUserMedia support:", error);
-            throw error;
+            const err = new Error("navigator.mediaDevices.getUserMedia is not supported in this browser or context.");
+            err.name = "NotSupportedError";
+            console.error("[MediaPipe/Camera Stream Issue] Browser missing mediaDevices or getUserMedia support:", err);
+            throw err;
         }
 
         if (navigator.mediaDevices.enumerateDevices) {
@@ -114,10 +114,10 @@ window.addEventListener("DOMContentLoaded", function () {
                 const videoInputs = devices.filter(d => d.kind === 'videoinput');
                 console.log(`[MediaPipe/Camera Stream Check] Found ${videoInputs.length} videoinput device(s):`, videoInputs);
                 if (videoInputs.length === 0) {
-                    const error = new Error("No physical videoinput camera device found on this system.");
-                    error.name = "NotFoundError";
-                    console.error("[MediaPipe/Camera Stream Issue] Zero camera devices detected:", error);
-                    throw error;
+                    const err = new Error("No physical videoinput camera device found on this system.");
+                    err.name = "NotFoundError";
+                    console.error("[MediaPipe/Camera Stream Issue] Zero camera devices detected:", err);
+                    throw err;
                 }
             } catch (enumErr) {
                 if (enumErr.name === "NotFoundError") throw enumErr;
@@ -141,33 +141,26 @@ window.addEventListener("DOMContentLoaded", function () {
             case "NotAllowedError":
             case "PermissionDeniedError":
                 userMessage = "Camera permission was denied. Please allow camera access in your browser address bar and click 'Retry Camera'.";
-                console.warn("[MediaPipe/Camera Stream Issue] User or iframe permission policy denied webcam access. Ensure camera permission is granted.");
                 break;
             case "NotFoundError":
             case "DevicesNotFoundError":
-                userMessage = "No webcam detected on your device. Please plug in a camera or use the interactive test buttons below to play.";
-                console.warn("[MediaPipe/Camera Stream Issue] No physical camera found (DevicesNotFoundError / NotFoundError).");
+                userMessage = "No webcam detected on your device. Please plug in a camera.";
                 break;
             case "NotReadableError":
             case "TrackStartError":
-                userMessage = "Camera is currently in use by another application or OS process. Please close other video apps and click 'Retry Camera'.";
-                console.warn("[MediaPipe/Camera Stream Issue] Video track start failed (NotReadableError). Device or OS capture pipeline is locked.");
+                userMessage = "Camera is currently in use by another application or OS process. Please close other video apps.";
                 break;
             case "OverconstrainedError":
                 userMessage = "The requested camera resolution is not supported by your webcam hardware.";
-                console.warn(`[MediaPipe/Camera Stream Issue] OverconstrainedError on constraint: ${err.constraint}`);
                 break;
             case "SecurityError":
                 userMessage = "Camera access was blocked due to an insecure context. Camera requires an HTTPS or localhost connection.";
-                console.warn("[MediaPipe/Camera Stream Issue] SecurityError: getUserMedia invoked from non-secure context or unauthorized origin.");
                 break;
             case "NotSupportedError":
                 userMessage = "Webcam media APIs are not supported in your current browser.";
-                console.warn("[MediaPipe/Camera Stream Issue] navigator.mediaDevices.getUserMedia is unavailable.");
                 break;
             default:
-                userMessage = `Camera access error: ${err.message || "Failed to initialize video stream"}. You can use the gesture test buttons below to play!`;
-                console.warn(`[MediaPipe/Camera Stream Issue] Generic capture exception: ${err.name} - ${err.message}`);
+                userMessage = `Camera access error: ${err.message || "Failed to initialize video stream"}.`;
         }
 
         showCameraErrorOverlay(userMessage);
@@ -187,7 +180,7 @@ window.addEventListener("DOMContentLoaded", function () {
             if (hudStatusText) hudStatusText.textContent = "SIMULATION MODE";
             if (hudStatusDot) hudStatusDot.style.backgroundColor = "#38bdf8";
             if (alignTextElem) {
-                alignTextElem.innerHTML = '<span class="text-info">Simulation active. Click the gesture test buttons below to play!</span>';
+                alignTextElem.innerHTML = '<span class="text-info">Simulation active.</span>';
             }
         });
     }
@@ -209,14 +202,6 @@ window.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Test Simulation Buttons
-    document.querySelectorAll(".sim-btn").forEach(btn => {
-        btn.addEventListener("click", function () {
-            const g = this.getAttribute("data-gesture");
-            handleGestureConfirmed(g);
-        });
-    });
-
     function updateChallengeUI() {
         if (lookingForIndex < showMeList.length) {
             const name = showMeList[lookingForIndex];
@@ -231,7 +216,7 @@ window.addEventListener("DOMContentLoaded", function () {
                 challengeNumElem.textContent = (lookingForIndex + 1).toString();
             }
             if (challengeProgressBar) {
-                const pct = ((lookingForIndex + 1) / showMeList.length) * 100;
+                const pct = ((lookingForIndex) / showMeList.length) * 100;
                 challengeProgressBar.style.width = `${pct}%`;
             }
 
@@ -240,7 +225,7 @@ window.addEventListener("DOMContentLoaded", function () {
             if (holdContainer) holdContainer.style.display = "none";
             if (holdBar) holdBar.style.width = "0%";
 
-            // Highlight target card
+            // Highlight target card in prediction meters
             for (let i = 0; i < 4; i++) {
                 const card = document.getElementById(`pred-card-${i}`);
                 if (card) {
@@ -298,23 +283,17 @@ window.addEventListener("DOMContentLoaded", function () {
                 window.requestAnimationFrame(renderLoop);
             } catch (camErr) {
                 console.warn("[MediaPipe/Camera Stream Issue] Primary constraints failed, trying basic fallback constraint:", camErr);
-                try {
-                    // Fallback to basic video constraint
-                    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                    if (videoElem) {
-                        videoElem.srcObject = localStream;
-                        await videoElem.play();
-                    }
-                    isRunning = true;
-                    if (canvas) canvas.style.display = "block";
-                    if (idleScreen) idleScreen.style.display = "none";
-                    if (hudStatusText) hudStatusText.textContent = "LIVE • POSE TRACKING";
-                    if (hudStatusDot) hudStatusDot.style.backgroundColor = "#22c55e";
-                    window.requestAnimationFrame(renderLoop);
-                } catch (fallbackErr) {
-                    handleCameraStreamError(fallbackErr);
-                    return;
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                if (videoElem) {
+                    videoElem.srcObject = localStream;
+                    await videoElem.play();
                 }
+                isRunning = true;
+                if (canvas) canvas.style.display = "block";
+                if (idleScreen) idleScreen.style.display = "none";
+                if (hudStatusText) hudStatusText.textContent = "LIVE • POSE TRACKING";
+                if (hudStatusDot) hudStatusDot.style.backgroundColor = "#22c55e";
+                window.requestAnimationFrame(renderLoop);
             }
 
             if (canvas) {
@@ -347,7 +326,7 @@ window.addEventListener("DOMContentLoaded", function () {
             ctx.drawImage(videoElem, 0, 0, w, h);
             ctx.restore();
 
-            // Run PoseNet estimation
+            // Run PoseNet estimation & sequential evaluation
             if (model && !isAdvancing) {
                 try {
                     const { pose, posenetOutput } = await model.estimatePose(canvas);
@@ -358,10 +337,8 @@ window.addEventListener("DOMContentLoaded", function () {
                         const validKeypoints = pose.keypoints.filter(k => k.score > 0.2);
                         const count = validKeypoints.length;
 
-                        // Draw enhanced skeleton & joints
                         drawEnhancedPose(pose, ctx, w, h);
 
-                        // Update Person Tracking Indicator
                         if (personIndicator) {
                             if (count >= 5) {
                                 personIndicator.className = "badge bg-success font-monospace";
@@ -386,10 +363,7 @@ window.addEventListener("DOMContentLoaded", function () {
                         }
                     }
 
-                    // Process Gesture Predictions
-                    let topClass = "";
-                    let topProb = 0;
-
+                    // Process Gesture Prediction meters
                     for (let i = 0; i < maxPredictions; i++) {
                         const prob = prediction[i].probability;
                         const pct = Math.round(prob * 100);
@@ -398,29 +372,21 @@ window.addEventListener("DOMContentLoaded", function () {
                         const text = document.getElementById(`pred-pct-${i}`);
                         if (bar) bar.style.width = `${pct}%`;
                         if (text) text.textContent = `${pct}%`;
-
-                        if (prob > topProb) {
-                            topProb = prob;
-                            topClass = prediction[i].className;
-                        }
                     }
 
-                    // Check against current target challenge
+                    // Strict Sequential Check: Evaluate ONLY the currently active target gesture
                     const targetName = showMeList[lookingForIndex];
-                    const normalizedTop = getModelName(topClass);
+                    const targetPrediction = prediction.find(p => getModelName(p.className) === targetName);
+                    const targetProb = targetPrediction ? targetPrediction.probability : 0;
 
-                    // If the current target is detected with >= 0.50 probability
-                    const targetProb = prediction[lookingForIndex] ? prediction[lookingForIndex].probability : 0;
-                    const isTargetActive = (normalizedTop === targetName && topProb >= 0.50) || (targetProb >= 0.60);
-
-                    if (isTargetActive) {
+                    if (targetProb >= 0.55) {
                         holdCount++;
                         if (holdContainer) holdContainer.style.display = "block";
                         const pct = Math.min(100, Math.round((holdCount / REQUIRED_HOLD_FRAMES) * 100));
                         if (holdBar) holdBar.style.width = `${pct}%`;
                         if (holdPct) holdPct.textContent = `${pct}%`;
                         if (holdStatusText) {
-                            holdStatusText.textContent = `Holding ${targetName} pose... ${pct}%`;
+                            holdStatusText.textContent = `Holding ${targetName}... ${pct}%`;
                         }
 
                         if (holdCount >= REQUIRED_HOLD_FRAMES) {
@@ -440,7 +406,7 @@ window.addEventListener("DOMContentLoaded", function () {
                     }
 
                 } catch (predErr) {
-                    // Frame drop
+                    // Frame drop handled silently
                 }
             }
         }
@@ -450,8 +416,6 @@ window.addEventListener("DOMContentLoaded", function () {
 
     function drawEnhancedPose(pose, ctx, w, h) {
         if (!pose || !pose.keypoints) return;
-
-        // Draw connections
         const minPartConfidence = 0.25;
         ctx.lineWidth = 3;
         ctx.strokeStyle = "#00f0ff";
@@ -460,28 +424,19 @@ window.addEventListener("DOMContentLoaded", function () {
         tmPose.drawSkeleton(pose.keypoints, minPartConfidence, ctx);
         ctx.shadowBlur = 0;
 
-        // Draw glowing joint points
         pose.keypoints.forEach((kp, idx) => {
             if (kp.score >= minPartConfidence) {
                 const { x, y } = kp.position;
                 ctx.beginPath();
                 ctx.arc(x, y, 5, 0, Math.PI * 2);
-
-                // Highlight wrists and hands in pink, face in cyan, shoulders in yellow
                 if (idx === 9 || idx === 10) {
-                    ctx.fillStyle = "#ec4899"; // wrists / hands
-                    ctx.shadowColor = "#ec4899";
-                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = "#ec4899";
                 } else if (idx === 5 || idx === 6) {
-                    ctx.fillStyle = "#eab308"; // shoulders
-                    ctx.shadowColor = "#eab308";
-                    ctx.shadowBlur = 6;
+                    ctx.fillStyle = "#eab308";
                 } else {
-                    ctx.fillStyle = "#38bdf8"; // joints
-                    ctx.shadowBlur = 4;
+                    ctx.fillStyle = "#38bdf8";
                 }
                 ctx.fill();
-                ctx.shadowBlur = 0;
             }
         });
     }
@@ -509,33 +464,21 @@ window.addEventListener("DOMContentLoaded", function () {
             playSound(bell);
 
             if (holdContainer) holdContainer.style.display = "none";
-            if (incorrectElement) incorrectElement.style.display = "none";
             if (correctElement) {
                 correctElement.style.display = "block";
                 if (correctHeaderElement) {
-                    correctHeaderElement.innerHTML = `Great job! You made the <strong>${targetName}</strong> gesture!`;
+                    correctHeaderElement.innerHTML = `Great job! Mastered <strong>${targetName}</strong>!`;
                 }
             }
 
             setTimeout(function () {
                 if (correctElement) correctElement.style.display = "none";
-            }, 2000);
+            }, 1500);
 
             setTimeout(async function () {
                 await advanceQuestion();
                 isAdvancing = false;
-            }, 1800);
-        } else {
-            playSound(error);
-            if (incorrectElement) {
-                incorrectElement.style.display = "block";
-                if (incorrectHeaderElement) {
-                    incorrectHeaderElement.innerHTML = `Pose not recognized for <strong>${targetName}</strong>`;
-                }
-                setTimeout(function () {
-                    if (incorrectElement) incorrectElement.style.display = "none";
-                }, 1800);
-            }
+            }, 1500);
         }
     }
 
@@ -544,13 +487,13 @@ window.addEventListener("DOMContentLoaded", function () {
         if (lookingForIndex < showMeList.length) {
             updateChallengeUI();
         } else {
-            // All 4 challenges completed!
+            // All 4 challenges completed successfully!
             playSound(jinglebells);
             if (questionElem) {
-                questionElem.innerHTML = "🎉 Congratulations! You Mastered All Gestures! 🎉";
+                questionElem.innerHTML = "🎉 Congratulations! All 4 Gestures Mastered! 🎉";
             }
             if (gestureHintElem) {
-                gestureHintElem.innerHTML = "<span class='text-success fw-bold'>All 4 challenges completed. Check your score on the Leaderboard!</span>";
+                gestureHintElem.innerHTML = "<span class='text-success fw-bold'>Redirecting to Leaderboard...</span>";
             }
             if (challengeProgressBar) {
                 challengeProgressBar.style.width = "100%";
@@ -562,12 +505,22 @@ window.addEventListener("DOMContentLoaded", function () {
             if (restartBtn) restartBtn.style.display = "inline-block";
             if (startBtn) startBtn.style.display = "none";
 
-            // Record completed score
-            fetch('/api/score', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ score: 4 })
-            }).catch(e => console.warn(e));
+            // Post final score (4/4) to Render database and redirect
+            try {
+                const response = await fetch('/api/score', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: 4 })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    setTimeout(() => {
+                        window.location.href = '/scoreboard';
+                    }, 1500);
+                }
+            } catch (e) {
+                console.warn('Failed to post final score:', e);
+            }
         }
     }
 
@@ -620,4 +573,5 @@ window.addEventListener("DOMContentLoaded", function () {
 
     // Initial setup
     updateChallengeUI();
+    init();
 });

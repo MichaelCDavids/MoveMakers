@@ -1,108 +1,127 @@
 import express from 'express';
+import { engine } from 'express-handlebars';
+import pkg from 'pg';
+import dotenv from 'dotenv';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
-import handlebars from 'handlebars';
+
+dotenv.config();
+const { Pool } = pkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// 1. Initialize Express FIRST
 const app = express();
-const PORT = 3000;
-const HOST = '0.0.0.0';
+const PORT = process.env.PORT || 3000;
 
-// In-memory player database (replaces PostgreSQL from Java JDBI)
-const playerList = [
-  { playerId: 1, playerName: 'Michael', playerAge: 24, score: 4 },
-  { playerId: 2, playerName: 'Phumlani', playerAge: 22, score: 4 },
-  { playerId: 3, playerName: 'Sesethu', playerAge: 21, score: 3 },
-];
-let nextPlayerId = 4;
+// 2. Configure Handlebars View Engine
+app.engine('.handlebars', engine({ 
+    extname: '.handlebars',
+    defaultLayout: false,
+    layoutsDir: path.join(__dirname, 'views'),
+    partialsDir: path.join(__dirname, 'views') 
+}));
+app.set('view engine', '.handlebars');
+app.set('views', path.join(__dirname, 'views'));
+
+// PostgreSQL Connection Pool (Render requires SSL)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+pool.on('connect', () => {
+  console.log('Connected to Render PostgreSQL database successfully!');
+});
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configure Handlebars view rendering
-const viewsDir = path.join(__dirname, 'views');
-
-// Pre-register all Handlebars partials
-function registerAllPartials() {
-  if (!fs.existsSync(viewsDir)) return;
-  const files = fs.readdirSync(viewsDir);
-  files.forEach(file => {
-    if (file.endsWith('.handlebars')) {
-      const content = fs.readFileSync(path.join(viewsDir, file), 'utf8');
-      // Register with exact filename and without extension
-      handlebars.registerPartial(file, content);
-      handlebars.registerPartial(file.replace('.handlebars', ''), content);
-    }
-  });
-}
-registerAllPartials();
-
-// Custom render function matching Spark Java: render(model, templatePath)
-function renderTemplate(templateName, data = {}) {
-  const filePath = path.join(viewsDir, templateName.endsWith('.handlebars') ? templateName : `${templateName}.handlebars`);
-  const templateSource = fs.readFileSync(filePath, 'utf8');
-  const compiled = handlebars.compile(templateSource);
-  return compiled(data);
-}
-
-// Routes matching Java Spark App.java
+// 1. Home / Start Page Route
 app.get('/', (req, res) => {
-  res.redirect('/index');
-});
-
-app.get('/index', (req, res) => {
-  const html = renderTemplate('index.handlebars', { activeHome: true });
-  res.send(html);
-});
-
-app.post('/add/player', (req, res) => {
-  const name = (req.body.name || 'Anonymous').trim();
-  const age = parseInt(req.body.age, 10) || 0;
-  
-  const newPlayer = {
-    playerId: nextPlayerId++,
-    playerName: name,
-    playerAge: age,
-    score: 0
-  };
-  playerList.push(newPlayer);
-  console.log(`[MoveMakers] Added player: ${name}, age: ${age}`);
-  
-  res.redirect('/start');
+    res.render('index', { title: 'MoveMakers - Registration' });
 });
 
 app.get('/start', (req, res) => {
-  const html = renderTemplate('start.handlebars', { activePlay: true });
-  res.send(html);
+    res.render('start', { title: 'MoveMakers - Game' });
 });
 
-app.get('/scoreboard', (req, res) => {
-  const html = renderTemplate('scoreboard.handlebars', {
-    activeScoreboard: true,
-    playerList: [...playerList].reverse(),
-  });
-  res.send(html);
+// 2. Player Registration Route (Handles POST from start form)
+app.post('/add/player', async (req, res) => {
+    try {
+        const { name, age } = req.body;
+        console.log(`[DB] Registering player -> Name: ${name}, Age: ${age}`);
+        
+        const query = `
+            INSERT INTO Player (player_name, player_age, score, created_at) 
+            VALUES ($1, $2, $3, NOW()) 
+            RETURNING *;
+        `;
+        const values = [name, parseInt(age, 10), 0];
+        const result = await pool.query(query, values);
+        const newPlayer = result.rows[0];
+
+        console.log('[DB] Player successfully saved:', newPlayer);
+
+        // Render game view (index) and pass the active player object
+        res.render('start', { player: newPlayer });
+    } catch (err) {
+        console.error('Database error during player registration:', err);
+        res.status(500).send('Internal Server Error: Unable to register player.');
+    }
 });
 
-// JSON API routes
-app.get('/api/players', (req, res) => {
-  res.json(playerList);
+// 3. Update Player Score Route
+app.post('/api/score', async (req, res) => {
+    try {
+        const { score } = req.body;
+        
+        // Update score for the most recent player session
+        const query = `
+            UPDATE Player 
+            SET score = $1 
+            WHERE player_id = (SELECT player_id FROM Player ORDER BY created_at DESC LIMIT 1) 
+            RETURNING *;
+        `;
+        const result = await pool.query(query, [score]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'No active player found to update.' });
+        }
+
+        res.status(200).json({ success: true, player: result.rows[0] });
+    } catch (err) {
+        console.error('Database error updating score:', err);
+        res.status(500).json({ error: 'Internal server error while saving score.' });
+    }
 });
 
-app.post('/api/score', (req, res) => {
-  const { playerId, score } = req.body;
-  const p = playerList.find(x => x.playerId === playerId);
-  if (p) {
-    p.score = (p.score || 0) + (score || 1);
-  }
-  res.json({ success: true, playerList });
+// 4. Leaderboard / Scoreboard Route
+app.get('/scoreboard', async (req, res) => {
+    try {
+        const query = `
+            SELECT player_id AS "playerId", player_name AS "playerName", player_age AS "playerAge", score 
+            FROM Player 
+            ORDER BY score DESC, created_at ASC 
+            LIMIT 10;
+        `;
+        const result = await pool.query(query);
+        const playerList = result.rows;
+
+        // Render the scoreboard template passing playerList
+        res.render('scoreboard', { playerList });
+    } catch (err) {
+        console.error('Database error fetching scoreboard:', err);
+        res.status(500).send('Internal Server Error: Unable to load leaderboard.');
+    }
 });
 
-app.listen(PORT, HOST, () => {
-  console.log(`[MoveMakers] Server listening on http://${HOST}:${PORT}`);
+// Start Server
+app.listen(PORT, () => {
+    console.log(`MoveMakers server running at http://localhost:${PORT}`);
 });

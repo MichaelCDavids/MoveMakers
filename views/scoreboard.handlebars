@@ -1,4 +1,4 @@
-{{> header.handlebars}}
+{{> header}}
 <div class="text-center mx-auto my-4" style="max-width: 600px;">
     <h1 class="mb-4">Move Makers Leaderboard</h1>
     <div class="table-responsive rounded shadow">
@@ -13,12 +13,16 @@
             </thead>
             <tbody>
                 {{#each playerList}}
-                    <tr class="align-middle">
-                        <td><strong>{{playerId}}</strong></td>
-                        <td>{{playerName}}</td>
-                        <td>{{playerAge}}</td>
-                        <td><span class="badge bg-success">{{#if score}}{{score}} / 4{{else}}4 / 4{{/if}}</span></td>
-                    </tr>
+                <tr>
+                    <td class="font-monospace fw-bold">#{{@index}}</td>
+                    <td>{{playerName}}</td>
+                    <td>{{playerAge}}</td>
+                    <td>
+                        <span class="badge bg-success">
+                            {{score}} / 4
+                        </span>
+                    </td>
+                </tr>
                 {{/each}}
             </tbody>
         </table>
@@ -29,4 +33,4 @@
         <a href="/" class="btn btn-outline-light">New Player</a>
     </div>
 </div>
-{{> footer.handlebars}}
+{{> footer}}
