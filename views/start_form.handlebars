@@ -1,0 +1,67 @@
+<div class="py-3">
+    <!-- Hero Title -->
+    <div class="mb-4">
+        <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-50 font-monospace mb-2">
+            DECEMBER HACKATHON &bull; PROJECTCODEX
+        </span>
+        <h1 class="display-4 fw-bold text-white mb-2">MoveMakers</h1>
+        <p class="lead text-white-50 mx-auto" style="max-width: 620px;">
+            Real-time PoseNet gesture detection powered by Google's Teachable Machine. Master all 4 body gestures in front of your camera to conquer the leaderboard!
+        </p>
+    </div>
+
+    <!-- 4 Gestures Preview Grid -->
+    <div class="row g-3 justify-content-center mb-4 text-start">
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark border-secondary border-opacity-50 h-100 p-2 shadow-sm text-center">
+                <div style="font-size: 32px;">🍽️</div>
+                <h6 class="text-white mt-1 mb-0">Hungry</h6>
+                <small class="text-white-50">Hand to mouth</small>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark border-secondary border-opacity-50 h-100 p-2 shadow-sm text-center">
+                <div style="font-size: 32px;">👀</div>
+                <h6 class="text-white mt-1 mb-0">I See You</h6>
+                <small class="text-white-50">Fingers to eyes</small>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark border-secondary border-opacity-50 h-100 p-2 shadow-sm text-center">
+                <div style="font-size: 32px;">🤫</div>
+                <h6 class="text-white mt-1 mb-0">Quiet Down</h6>
+                <small class="text-white-50">Finger on lips</small>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark border-secondary border-opacity-50 h-100 p-2 shadow-sm text-center">
+                <div style="font-size: 32px;">💃</div>
+                <h6 class="text-white mt-1 mb-0">Get Busy</h6>
+                <small class="text-white-50">Dancing hands up</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Player Entry Form Card -->
+    <div class="card bg-dark border-info border-opacity-25 shadow-lg mx-auto p-4 text-start" style="max-width: 440px;">
+        <h5 class="fw-bold text-white mb-3 text-center">Player Registration</h5>
+        <form action="/add/player" method="post">
+            <div class="mb-3">
+                <label for="validationDefault01" class="form-label text-white-50 small fw-bold">PLAYER NAME:</label>
+                <input type="text" class="form-control bg-dark border-secondary text-white" id="validationDefault01" name="name" placeholder="Enter your name or gamer tag..." required autofocus>
+            </div>
+            <div class="mb-4">
+                <label for="validationDefault02" class="form-label text-white-50 small fw-bold">AGE:</label>
+                <input type="number" class="form-control bg-dark border-secondary text-white" id="validationDefault02" name="age" placeholder="e.g. 21" min="1" max="120" required>
+            </div>
+            <div class="d-grid gap-2">
+                <button class="btn btn-success btn-lg fw-bold shadow" type="submit">
+                    Launch Challenge 🚀
+                </button>
+                <a href="/scoreboard" class="btn btn-outline-secondary btn-sm text-white-50 mt-1">
+                    View Current Leaderboard
+                </a>
+            </div>
+        </form>
+    </div>
+</div>

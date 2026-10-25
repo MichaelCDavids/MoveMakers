@@ -1,0 +1,32 @@
+{{> header.handlebars}}
+<div class="text-center mx-auto my-4" style="max-width: 600px;">
+    <h1 class="mb-4">Move Makers Leaderboard</h1>
+    <div class="table-responsive rounded shadow">
+        <table class="table table-dark table-striped table-hover mb-0">
+            <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Player Name</th>
+                    <th scope="col">Age</th>
+                    <th scope="col">Gestures Mastered</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each playerList}}
+                    <tr class="align-middle">
+                        <td><strong>{{playerId}}</strong></td>
+                        <td>{{playerName}}</td>
+                        <td>{{playerAge}}</td>
+                        <td><span class="badge bg-success">{{#if score}}{{score}} / 4{{else}}4 / 4{{/if}}</span></td>
+                    </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-4">
+        <a href="/start" class="btn btn-outline-info me-2">Play Again</a>
+        <a href="/" class="btn btn-outline-light">New Player</a>
+    </div>
+</div>
+{{> footer.handlebars}}

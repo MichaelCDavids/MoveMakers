@@ -1,0 +1,180 @@
+/* MoveMakers - Cyber Aesthetic & Camera HUD Styles */
+
+body {
+  text-shadow: 0 .05rem .1rem rgba(0, 0, 0, .5);
+  box-shadow: inset 0 0 5rem rgba(0, 0, 0, .7);
+  background-color: #0b0f19 !important;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.cover-container {
+  max-width: 60em;
+}
+
+/* Header Navigation */
+.nav-masthead .nav-link {
+  padding: .35rem .75rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, .6);
+  background-color: transparent;
+  border-bottom: .2rem solid transparent;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+}
+
+.nav-masthead .nav-link:hover,
+.nav-masthead .nav-link:focus {
+  color: #38bdf8;
+  border-bottom-color: rgba(56, 189, 248, 0.5);
+}
+
+.nav-masthead .nav-link + .nav-link {
+  margin-left: 0.5rem;
+}
+
+.nav-masthead .active {
+  color: #fff;
+  border-bottom-color: #0dcaf0;
+  background-color: rgba(13, 202, 240, 0.1);
+}
+
+/* Camera HUD Viewfinder Container */
+.hud-viewfinder {
+  position: relative;
+  display: inline-block;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #030712;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(13, 202, 240, 0.15);
+  border: 1px solid rgba(13, 202, 240, 0.3);
+}
+
+/* Corner Viewfinder Brackets */
+.hud-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #0dcaf0;
+  pointer-events: none;
+  z-index: 5;
+}
+.hud-corner-tl { top: 12px; left: 12px; border-right: none; border-bottom: none; border-top-left-radius: 8px; }
+.hud-corner-tr { top: 12px; right: 12px; border-left: none; border-bottom: none; border-top-right-radius: 8px; }
+.hud-corner-bl { bottom: 12px; left: 12px; border-right: none; border-top: none; border-bottom-left-radius: 8px; }
+.hud-corner-br { bottom: 12px; right: 12px; border-left: none; border-top: none; border-bottom-right-radius: 8px; }
+
+/* Viewfinder Center Reticle */
+.hud-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px;
+  height: 48px;
+  border: 1px dashed rgba(13, 202, 240, 0.4);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* HUD Scanning Beam Animation */
+.hud-scanner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #0dcaf0, transparent);
+  box-shadow: 0 0 8px #0dcaf0;
+  animation: scan 3s infinite linear;
+  pointer-events: none;
+  z-index: 6;
+}
+
+@keyframes scan {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Live Status Badge */
+.hud-status-badge {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  z-index: 7;
+  font-family: monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  background: rgba(3, 7, 18, 0.85);
+  backdrop-filter: blur(4px);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(13, 202, 240, 0.4);
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* Prediction Probability Cards */
+.hud-pred-card {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  border-radius: 10px;
+  padding: 8px 12px;
+  transition: all 0.2s ease;
+}
+
+.hud-pred-card.active-target {
+  border-color: #0dcaf0;
+  background: rgba(13, 202, 240, 0.1);
+  box-shadow: 0 0 12px rgba(13, 202, 240, 0.2);
+}
+
+.hud-meter {
+  height: 6px;
+  border-radius: 4px;
+  background: #1e293b;
+  overflow: hidden;
+}
+
+.hud-meter-fill {
+  height: 100%;
+  background: #0dcaf0;
+  transition: width 0.15s ease-out;
+}
+
+/* Feedback Cards */
+.hud-feedback-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  width: 85%;
+  max-width: 320px;
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popIn {
+  0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}

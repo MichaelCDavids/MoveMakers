@@ -1,0 +1,8 @@
+{
+  "name": "Gesture ML Studio",
+  "description": "Real-time AI & Machine Learning Hand Gesture Recognition platform with live landmark tracking, custom gesture trainer, interactive gesture-controlled apps, and telemetry analytics.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
