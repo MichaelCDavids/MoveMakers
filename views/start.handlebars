@@ -9,6 +9,9 @@
                     CHALLENGE <span id="challenge-num">1</span> OF 4
                 </span>
                 <div class="d-flex gap-2">
+                    <a href="/start" target="_blank" rel="noopener" class="badge bg-primary text-white text-decoration-none border border-primary font-monospace py-1" title="Open in dedicated tab for direct camera access">
+                        ⎘ Open in Tab
+                    </a>
                     <span id="person-indicator" class="badge bg-secondary font-monospace">
                         👤 Person: Off
                     </span>
@@ -72,8 +75,8 @@
                 </button>
             </div>
 
-            <!-- Hidden native HTML5 video stream element -->
-            <video id="webcam-video" playsinline muted autoplay class="d-none"></video>
+            <!-- Off-screen active HTML5 video stream element (NOT d-none so browser continues decoding frames!) -->
+            <video id="webcam-video" playsinline muted autoplay style="position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; z-index: -1;"></video>
 
             <!-- Primary Drawing Canvas Element -->
             <canvas id="canvas" width="380" height="380" class="w-100 h-100" style="display: none; object-fit: cover;">
@@ -196,16 +199,22 @@
         </button>
     </div>
 
-    <!-- Interactive Simulation Test Panel -->
-    <div class="card bg-dark border-secondary border-opacity-25 mx-auto mt-4 p-3" style="max-width: 680px;">
-        <div class="small text-white-50 mb-2 text-center">
-            <strong>Interactive Gesture Test Controls</strong> (Click button to simulate gesture test):
+    <!-- Teachable Machine Links Card -->
+    <div class="card bg-dark border-secondary border-opacity-25 mx-auto mt-3 p-3 text-start small font-monospace" style="max-width: 680px;">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="text-white fw-bold">🧠 Google Teachable Machine Models:</span>
+            <span class="badge bg-success bg-opacity-25 text-success border border-success">PoseNet v0.8</span>
         </div>
-        <div class="d-flex flex-wrap justify-content-center gap-2">
-            <button type="button" class="btn btn-sm btn-outline-info sim-btn" data-gesture="Hungry">🍽️ Hungry</button>
-            <button type="button" class="btn btn-sm btn-outline-info sim-btn" data-gesture="I See You">👀 I See You</button>
-            <button type="button" class="btn btn-sm btn-outline-info sim-btn" data-gesture="Quiet Down">🤫 Quiet Down</button>
-            <button type="button" class="btn btn-sm btn-outline-info sim-btn" data-gesture="Get Busy">💃 Get Busy</button>
+        <div class="text-white-50 small mb-2">
+            Trained with 4 classes: <strong>Hungry, ISeeYou, QuietDown, GetBusy</strong>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="https://teachablemachine.withgoogle.com/models/C8EwO48qN/" target="_blank" rel="noopener" class="btn btn-sm btn-outline-info text-decoration-none">
+                🔗 Active Model: C8EwO48qN (Dec 11 Hackathon) ↗
+            </a>
+            <a href="https://teachablemachine.withgoogle.com/models/Ybj48BAov/" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary text-decoration-none">
+                🔗 Archive Model: Ybj48BAov (Dec 9 v1) ↗
+            </a>
         </div>
     </div>
 </div>
