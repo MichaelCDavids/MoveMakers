@@ -30,6 +30,12 @@ window.addEventListener("DOMContentLoaded", function () {
     const bodyTrackingLabel = document.getElementById("body-tracking-label");
     const bodyConfidenceLabel = document.getElementById("body-confidence-label");
 
+    // Camera Error Overlay Elements
+    const cameraErrorOverlay = document.getElementById("camera-error-overlay");
+    const cameraErrorMessage = document.getElementById("camera-error-message");
+    const retryCameraBtn = document.getElementById("retry-camera-btn");
+    const dismissErrorBtn = document.getElementById("dismiss-error-btn");
+
     const mirrorBtn = document.getElementById("mirror-btn");
     const audioBtn = document.getElementById("audio-status-btn");
 
@@ -70,6 +76,121 @@ window.addEventListener("DOMContentLoaded", function () {
     let holdCount = 0;
     const REQUIRED_HOLD_FRAMES = 12; // ~0.4-0.5s of holding pose for certainty
     let isAdvancing = false;
+
+    // Camera Error Overlay Helpers
+    function hideCameraErrorOverlay() {
+        if (cameraErrorOverlay) cameraErrorOverlay.style.display = "none";
+    }
+
+    function showCameraErrorOverlay(userMessage) {
+        if (cameraErrorMessage) {
+            cameraErrorMessage.textContent = userMessage;
+        }
+        if (cameraErrorOverlay) {
+            cameraErrorOverlay.style.display = "block";
+        }
+        if (hudStatusText) hudStatusText.textContent = "CAMERA ERROR";
+        if (hudStatusDot) hudStatusDot.style.backgroundColor = "#ef4444";
+        if (personIndicator) {
+            personIndicator.className = "badge bg-danger font-monospace";
+            personIndicator.textContent = "👤 Camera: Blocked";
+        }
+        if (startBtn) startBtn.style.display = "inline-block";
+        if (stopBtn) stopBtn.style.display = "none";
+    }
+
+    // Camera Availability Check & Diagnostic Logger
+    async function checkCameraAvailability() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            const error = new Error("navigator.mediaDevices.getUserMedia is not supported in this browser or context.");
+            error.name = "NotSupportedError";
+            console.error("[MediaPipe/Camera Stream Issue] Browser missing mediaDevices or getUserMedia support:", error);
+            throw error;
+        }
+
+        if (navigator.mediaDevices.enumerateDevices) {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoInputs = devices.filter(d => d.kind === 'videoinput');
+                console.log(`[MediaPipe/Camera Stream Check] Found ${videoInputs.length} videoinput device(s):`, videoInputs);
+                if (videoInputs.length === 0) {
+                    const error = new Error("No physical videoinput camera device found on this system.");
+                    error.name = "NotFoundError";
+                    console.error("[MediaPipe/Camera Stream Issue] Zero camera devices detected:", error);
+                    throw error;
+                }
+            } catch (enumErr) {
+                if (enumErr.name === "NotFoundError") throw enumErr;
+                console.warn("[MediaPipe/Camera Stream Check] Could not enumerate devices:", enumErr);
+            }
+        }
+    }
+
+    function handleCameraStreamError(err) {
+        console.error("[MediaPipe/Camera Stream Issue] Detailed Stream Diagnostics:", {
+            name: err.name,
+            message: err.message,
+            constraint: err.constraint || "N/A",
+            stack: err.stack,
+            timestamp: new Date().toISOString()
+        });
+
+        let userMessage = "Unable to access the camera.";
+
+        switch (err.name) {
+            case "NotAllowedError":
+            case "PermissionDeniedError":
+                userMessage = "Camera permission was denied. Please allow camera access in your browser address bar and click 'Retry Camera'.";
+                console.warn("[MediaPipe/Camera Stream Issue] User or iframe permission policy denied webcam access. Ensure camera permission is granted.");
+                break;
+            case "NotFoundError":
+            case "DevicesNotFoundError":
+                userMessage = "No webcam detected on your device. Please plug in a camera or use the interactive test buttons below to play.";
+                console.warn("[MediaPipe/Camera Stream Issue] No physical camera found (DevicesNotFoundError / NotFoundError).");
+                break;
+            case "NotReadableError":
+            case "TrackStartError":
+                userMessage = "Camera is currently in use by another application or OS process. Please close other video apps and click 'Retry Camera'.";
+                console.warn("[MediaPipe/Camera Stream Issue] Video track start failed (NotReadableError). Device or OS capture pipeline is locked.");
+                break;
+            case "OverconstrainedError":
+                userMessage = "The requested camera resolution is not supported by your webcam hardware.";
+                console.warn(`[MediaPipe/Camera Stream Issue] OverconstrainedError on constraint: ${err.constraint}`);
+                break;
+            case "SecurityError":
+                userMessage = "Camera access was blocked due to an insecure context. Camera requires an HTTPS or localhost connection.";
+                console.warn("[MediaPipe/Camera Stream Issue] SecurityError: getUserMedia invoked from non-secure context or unauthorized origin.");
+                break;
+            case "NotSupportedError":
+                userMessage = "Webcam media APIs are not supported in your current browser.";
+                console.warn("[MediaPipe/Camera Stream Issue] navigator.mediaDevices.getUserMedia is unavailable.");
+                break;
+            default:
+                userMessage = `Camera access error: ${err.message || "Failed to initialize video stream"}. You can use the gesture test buttons below to play!`;
+                console.warn(`[MediaPipe/Camera Stream Issue] Generic capture exception: ${err.name} - ${err.message}`);
+        }
+
+        showCameraErrorOverlay(userMessage);
+    }
+
+    // Error Overlay Action Handlers
+    if (retryCameraBtn) {
+        retryCameraBtn.addEventListener("click", async function () {
+            hideCameraErrorOverlay();
+            await init();
+        });
+    }
+
+    if (dismissErrorBtn) {
+        dismissErrorBtn.addEventListener("click", function () {
+            hideCameraErrorOverlay();
+            if (hudStatusText) hudStatusText.textContent = "SIMULATION MODE";
+            if (hudStatusDot) hudStatusDot.style.backgroundColor = "#38bdf8";
+            if (alignTextElem) {
+                alignTextElem.innerHTML = '<span class="text-info">Simulation active. Click the gesture test buttons below to play!</span>';
+            }
+        });
+    }
 
     // Audio Toggle
     if (audioBtn) {
@@ -130,6 +251,7 @@ window.addEventListener("DOMContentLoaded", function () {
     }
 
     async function init() {
+        hideCameraErrorOverlay();
         const modelURL = URL + "model.json";
         const metadataURL = URL + "metadata.json";
 
@@ -142,6 +264,9 @@ window.addEventListener("DOMContentLoaded", function () {
                 model = await tmPose.load(modelURL, metadataURL);
                 maxPredictions = model.getTotalClasses();
             }
+
+            // Perform Camera Availability Pre-Check
+            await checkCameraAvailability();
 
             // Launch Camera using standard getUserMedia
             if (hudStatusText) hudStatusText.textContent = "ACCESSING WEBCAM...";
@@ -172,7 +297,7 @@ window.addEventListener("DOMContentLoaded", function () {
 
                 window.requestAnimationFrame(renderLoop);
             } catch (camErr) {
-                console.warn("Direct webcam failed, trying fallback:", camErr);
+                console.warn("[MediaPipe/Camera Stream Issue] Primary constraints failed, trying basic fallback constraint:", camErr);
                 try {
                     // Fallback to basic video constraint
                     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -183,14 +308,12 @@ window.addEventListener("DOMContentLoaded", function () {
                     isRunning = true;
                     if (canvas) canvas.style.display = "block";
                     if (idleScreen) idleScreen.style.display = "none";
+                    if (hudStatusText) hudStatusText.textContent = "LIVE • POSE TRACKING";
+                    if (hudStatusDot) hudStatusDot.style.backgroundColor = "#22c55e";
                     window.requestAnimationFrame(renderLoop);
                 } catch (fallbackErr) {
-                    console.error("Camera access blocked or denied:", fallbackErr);
-                    if (hudStatusText) hudStatusText.textContent = "SIMULATION MODE";
-                    if (hudStatusDot) hudStatusDot.style.backgroundColor = "#38bdf8";
-                    if (alignTextElem) {
-                        alignTextElem.innerHTML = '<span class="text-warning">Camera access blocked. Click the gesture buttons below to test!</span>';
-                    }
+                    handleCameraStreamError(fallbackErr);
+                    return;
                 }
             }
 
@@ -204,9 +327,7 @@ window.addEventListener("DOMContentLoaded", function () {
 
             updateChallengeUI();
         } catch (err) {
-            console.error("Initialization error:", err);
-            if (hudStatusText) hudStatusText.textContent = "MODEL ERROR";
-            if (hudStatusDot) hudStatusDot.style.backgroundColor = "#ef4444";
+            handleCameraStreamError(err);
         }
     }
 

@@ -113,6 +113,23 @@
                 <h4 id="incorrect-toggle-header" class="fw-bold mb-1">Try Again</h4>
                 <p class="small text-white-50 mb-0">Step back and hold pose steady</p>
             </div>
+
+            <!-- Camera Access Error Overlay -->
+            <div id="camera-error-overlay" class="hud-feedback-overlay card bg-dark border-danger text-white shadow-lg p-3 text-center" style="display: none; border-width: 2px; width: 90%; max-width: 340px; z-index: 20;">
+                <div class="text-danger mb-1" style="font-size: 32px;">🚫 📷</div>
+                <h5 class="fw-bold text-danger mb-1">Camera Access Error</h5>
+                <p id="camera-error-message" class="small text-white-50 mb-3 font-monospace" style="font-size: 11px;">
+                    Unable to initialize video stream. Please verify your camera permissions.
+                </p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button id="retry-camera-btn" type="button" class="btn btn-sm btn-outline-danger px-3">
+                        ↻ Retry Camera
+                    </button>
+                    <button id="dismiss-error-btn" type="button" class="btn btn-sm btn-outline-secondary px-3">
+                        Use Test Buttons
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
